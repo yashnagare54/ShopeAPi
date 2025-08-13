@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Checkout — Demo Shop</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container py-5">
+    <div class="card p-4 mx-auto" style="max-width:720px;">
+      <h3>Checkout (Mock)</h3>
+      <form id="checkoutForm" class="row g-3 mt-2">
+        <div class="col-md-6"><input id="name" class="form-control" placeholder="Full name" required></div>
+        <div class="col-md-6"><input id="email" class="form-control" placeholder="Email" required></div>
+        <div class="col-md-6"><input id="amount" type="number" class="form-control" value="500" min="1" required></div>
+        <div class="col-12"><button id="payBtn" class="btn btn-primary w-100">Proceed to pay ₹<span id="amtPreview">500</span></button></div>
+      </form>
+      <div id="message" class="mt-3"></div>
+    </div>
+  </div>
+
+  <!-- simple modal -->
+  <div id="mockModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+    <div style="background:#fff;padding:20px;border-radius:8px;max-width:520px;margin:auto">
+      <h5>Mock Checkout</h5>
+      <p>Order: <span id="modalOrderId"></span> — ₹<span id="modalAmount"></span></p>
+      <button id="confirmSuccess" class="btn btn-success">Simulate SUCCESS</button>
+      <button id="confirmFail" class="btn btn-danger ms-2">Simulate FAIL</button>
+      <button id="closeModal" class="btn btn-link float-end">Close</button>
+    </div>
+  </div>
+
+<script>
+  const amountInput = document.getElementById('amount');
+  const amtPreview = document.getElementById('amtPreview');
+  amountInput.addEventListener('input', ()=> amtPreview.textContent = amountInput.value);
+
+  const form = document.getElementById('checkoutForm');
+  const message = document.getElementById('message');
+  const modal = document.getElementById('mockModal');
+  const modalOrderId = document.getElementById('modalOrderId');
+  const modalAmount = document.getElementById('modalAmount');
+  let currentOrder = null;
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    message.innerHTML = '';
+    const payload = {
+      name: document.getElementById('name').value,
+      email: document.getElementById('email').value,
+      amount: parseInt(amountInput.value||'100',10)
+    };
+    try {
+      const res = await fetch('/create_order', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok){ throw new Error('Create order failed: '+res.status); }
+      const order = await res.json();
+      currentOrder = order;
+      modalOrderId.textContent = order.id;
+      modalAmount.textContent = order.amount_rupees;
+      modal.style.display = 'flex';
+    } catch(err){
+      message.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+  });
+
+  document.getElementById('confirmSuccess').addEventListener('click', ()=> confirm('success'));
+  document.getElementById('confirmFail').addEventListener('click', ()=> confirm('fail'));
+  document.getElementById('closeModal').addEventListener('click', ()=> modal.style.display='none');
+
+  async function confirm(result){
+    if(!currentOrder) { alert('Create order first'); return; }
+    const res = await fetch('/confirm_payment',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({order_id: currentOrder.id, result})
+    });
+    const data = await res.json();
+    if(res.ok && data.status==='PAID') window.location.href='/payment_success';
+    else window.location.href='/payment_failed';
+  }
+</script>
+</body>
+</html>
